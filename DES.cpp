@@ -1,6 +1,6 @@
 // source file
 #include "DES.h"
-#include "utils.h"
+#include "utility.h"
 using namespace constants;
 
 uint64_t feistelFunction(uint64_t subkey, uint64_t bits){

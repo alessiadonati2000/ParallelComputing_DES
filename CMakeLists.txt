@@ -6,9 +6,9 @@ set(CMAKE_CUDA_STANDARD 17)             # imposta lo standard a C++ 17
 
 add_executable(DES    # crea un eseguibile chiamato DES compilando
         main.cu       # main del programma
-        utils.h       # funzioni di supporto
-        d_DES.cu      # codice CUDA
-        d_DES.cuh
+        utility.h     # funzioni di supporto
+        DES_parallel.cu      # codice CUDA
+        DES_parallel.cuh
         DES.cpp       # implementazione CPU
         DES.h
 )

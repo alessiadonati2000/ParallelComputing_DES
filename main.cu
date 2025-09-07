@@ -7,9 +7,9 @@
 #include <chrono>       // per misurare i tempi
 #include <sstream>      // per creare stringhe formattate
 #include <numeric>      // per funzioni matematiche
-#include "utils.h"      // per funzioni di utilità
+#include "utility.h"      // per funzioni di utilità
 #include "DES.h"        // per DES lato CPU
-#include "d_DES.cuh"    // per DES lato CUDA
+#include "DES_parallel.cuh"    // per DES lato CUDA
 using namespace constants;
 using namespace std;
 using namespace chrono;
