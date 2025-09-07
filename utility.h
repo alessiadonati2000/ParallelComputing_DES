@@ -144,19 +144,19 @@ namespace constants
 }
 
 // Genera N parole casuali di lunghezza length
-static vector<string> wordsGeneration(int N=10, int length=8){
+static vector<string> passwordsGeneration(int numPassword, int length){
     random_device rd;  // a seed source for the random number engine
     mt19937 gen(rd()); // mersenne_twister_engine seeded with rd()
     uniform_int_distribution<> distrib(0, 64);
-    vector<string> words;
-    for( int i = 0; i < N; i++){
+    vector<string> passwords;
+    for( int i = 0; i < numPassword; i++){
         string s;
         for(int j = 0; j < length; j++){
             s += constants::charSet[distrib(gen)];
         }
-        words.push_back(s);
+        passwords.push_back(s);
     }
-    return words;
+    return passwords;
 }
 
 // Converte una stringa max 8 caratteri in un intero 64 bit

@@ -16,20 +16,20 @@ using namespace chrono;
 
 int main() {
     // Dizionario delle password
-    string wordsPath = R"(C:\Users\AleDo\Desktop\Parallel Computing\Esame\DES-master\words.txt)";
+    string passwordPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\password.txt)";
 
     // Genera un timestamp per avere un nome univoco dei file dei risultati
-    auto t = std::time(nullptr);
-    auto tm = *std::localtime(&t);
+    auto time = std::time(nullptr);
+    auto localTime = *std::localtime(&time);
     std::ostringstream ss;
-    ss << std::put_time(&tm, "%Y%m%d-%H%M%S");
+    ss << std::put_time(&localTime, "%Y%m%d-%H%M%S");
     auto str = ss.str();
-    string resultsPath = R"(C:\Users\AleDo\Desktop\Parallel Computing\Esame\DES-master\results-)" + ss.str() + ".txt";
+    string resultsPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\Results\results-)" + ss.str() + ".txt";
 
     // Parametri dell'esperimento
     bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
     bool saveResults = true;                        // salva su file i risultati
-    int N = 1000000;                                // grandezza del dizionario (1M password)
+    int numPassword = 100;                          // grandezza del dizionario (1M password)
     int length = 8;                                 // lunghezza delle password
     vector<int> blockSizes = {32, 64, 128, 256};    // block size CUDA da testare
     int nCrack = 1000;                              // numero di password da craccare
@@ -37,23 +37,23 @@ int main() {
     uint64_t key = toUint64_T("a2kvt8rz");     // chiave DES fissa per cifrare e tentare il brute force
 
     // Se esiste già il dizionario
-    if (filesystem::exists(wordsPath) && !overwrite) {
+    if (filesystem::exists(passwordPath) && !overwrite) {
 
         // Crea un vettore (pwdList) con tutte le parole del file specificato
-        ifstream wordsFile(wordsPath);
+        ifstream passwordsFile(passwordPath);
         string pwd;
         int pwdCount = 0;
-        auto *pwdList = new uint64_t [N];
-        while (getline(wordsFile, pwd) && pwdCount < N) {   // legge il file riga per riga
+        auto *pwdList = new uint64_t [numPassword];
+        while (getline(passwordsFile, pwd) && pwdCount < numPassword) {   // legge il file riga per riga
             pwdList[pwdCount] = toUint64_T(pwd);                  // converte ogni parola in uint64_t
             pwdCount++;
         }
-        wordsFile.close();
+        passwordsFile.close();
 
         // Generazione set di test
         random_device rd;           // a seed source for the random number engine
         mt19937 gen(rd());      // mersenne_twister_engine seeded with rd()
-        uniform_int_distribution<> distrib(0, N);
+        uniform_int_distribution<> distrib(0, numPassword);
 
         vector<uint64_t*> tests;    // lista degli hash (password da craccare)
         // sceglie a caso, secondo una distribuzione uniforme, una password dal dizionario
@@ -68,7 +68,7 @@ int main() {
 
 
         cout << "------------------ Experiments parameters ------------------";
-        cout << "\nSearch space: " << N;
+        cout << "\nSearch space: " << numPassword;
         cout << "\nPasswords lengths: " << length;
         cout << "\nNumber of passwords to crack: " << nCrack;
         cout << "\nBlock sizes to test: " << toString<int>(blockSizes);
@@ -82,7 +82,7 @@ int main() {
             auto start = system_clock::now();
 
             for (int i = 0; i < nCrack; i++){
-                for (int j = 0; j < N; j++){    // prova tutte le N password del dizionario
+                for (int j = 0; j < numPassword; j++){    // prova tutte le N password del dizionario
                     if (pwdToCrack[i] == desEncrypt(key, pwdList[j]))   // le cifra e le confronta
                         break;
                 }
@@ -109,7 +109,7 @@ int main() {
                 bool *found;
                 auto start = system_clock::now();
 
-                found = parallelCrack(pwdList, N, test, nCrack, key, blockSize);
+                found = parallelCrack(pwdList, numPassword, test, nCrack, key, blockSize);
 
                 auto end = system_clock::now();
                 auto parElapsed = duration_cast<milliseconds>(end - start);
@@ -136,7 +136,7 @@ int main() {
         if (saveResults){
             ofstream resultsFile(resultsPath);  // crea e/o apre il file dei risultati
             resultsFile << "------------------ Experiments parameters ------------------";
-            resultsFile << "\nSearch space: " << N;
+            resultsFile << "\nSearch space: " << numPassword;
             resultsFile << "\nPasswords lengths: " << length;
             resultsFile << "\nNumber of passwords to crack: " << nCrack;
             resultsFile << "\nNumber of tests for each experiment: " << nTests;
@@ -150,15 +150,14 @@ int main() {
         free(pwdList);
     } else {
         // Altrimenti genera il dizionario
-        vector<string> words = wordsGeneration(N, length);
-        ofstream wordsFile(wordsPath);
+        vector<string> passwords = passwordsGeneration(numPassword, length);
+        ofstream passwordsFile(passwordPath);
 
-        for(const auto& word : words){
-            wordsFile << word << "\n";
+        for(const auto& password : passwords){
+            passwordsFile << password << "\n";
         }
-        wordsFile.close();
-        cout << "New word file created" << endl;
-
+        passwordsFile.close();
+        cout << "New password file created" << endl;
     }
 
 
