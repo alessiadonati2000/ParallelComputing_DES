@@ -14,7 +14,7 @@ auto permute_p(const uint64_t source,const int *table) -> uint64_t{
     return p;
 }
 __host__
-bool * parallelCrack(uint64_t *pwdList, int N, uint64_t *pwdToCrack, int nCrack, uint64_t key, int blockSize);
+bool * parallelCrack(uint64_t *pwdList, int N, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize);
 
 __device__
 uint64_t feistelFunction_p(uint64_t subkey, uint64_t bits);

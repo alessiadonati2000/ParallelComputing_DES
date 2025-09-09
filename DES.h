@@ -24,6 +24,6 @@ static auto permute(uint64_t source, const int* table) -> uint64_t {
 
 uint64_t feistelFunction(uint64_t subkey, uint64_t bits);
 
-uint64_t desEncrypt(uint64_t key56, uint64_t message);
+uint64_t desEncrypt(uint64_t key56, uint64_t plaintext);
 
 #endif //DES_DES_H

@@ -147,7 +147,7 @@ namespace constants
 static vector<string> passwordsGeneration(int numPassword, int length){
     random_device rd;  // a seed source for the random number engine
     mt19937 gen(rd()); // mersenne_twister_engine seeded with rd()
-    uniform_int_distribution<> distrib(0, 64);
+    uniform_int_distribution<> distrib(0, 63);
     vector<string> passwords;
     for( int i = 0; i < numPassword; i++){
         string s;

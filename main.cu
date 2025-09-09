@@ -16,141 +16,156 @@ using namespace chrono;
 
 int main() {
     // Dizionario delle password
-    string passwordPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\password.txt)";
+        string passwordPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\password.txt)";
 
     // Genera un timestamp per avere un nome univoco dei file dei risultati
-    auto time = std::time(nullptr);
-    auto localTime = *std::localtime(&time);
-    std::ostringstream ss;
-    ss << std::put_time(&localTime, "%Y%m%d-%H%M%S");
-    auto str = ss.str();
-    string resultsPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\Results\results-)" + ss.str() + ".txt";
+        auto time = std::time(nullptr);
+        auto localTime = *std::localtime(&time);
+        std::ostringstream ss;
+        ss << std::put_time(&localTime, "%Y%m%d-%H%M%S");
+        auto str = ss.str();
+        string resultsPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\Results\results-)" + ss.str() + ".txt";
 
     // Parametri dell'esperimento
-    bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
-    bool saveResults = true;                        // salva su file i risultati
-    int numPassword = 100;                          // grandezza del dizionario (1M password)
-    int length = 8;                                 // lunghezza delle password
-    vector<int> blockSizes = {32, 64, 128, 256};    // block size CUDA da testare
-    int nCrack = 1000;                              // numero di password da craccare
-    int nTests = 10;                                // ripetizioni dell'esperimento
-    uint64_t key = toUint64_T("a2kvt8rz");     // chiave DES fissa per cifrare e tentare il brute force
+        bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
+        bool saveResults = true;                        // salva su file i risultati
+        int pwdNum = 100000;                            // grandezza del dizionario
+        int pwdLength = 8;                              // lunghezza delle password
+        int numCrack = 1000;                            // numero di password da craccare
+        int numTests = 10;                              // ripetizioni dell'esperimento
+        vector<int> blockSizes = {32, 64, 128, 256};    // block size CUDA da testare
+        uint64_t key = toUint64_T("a2kvt8rz");     // chiave DES fissa per cifrare e tentare il brute force
 
     // Se esiste già il dizionario
     if (filesystem::exists(passwordPath) && !overwrite) {
 
-        // Crea un vettore (pwdList) con tutte le parole del file specificato
-        ifstream passwordsFile(passwordPath);
-        string pwd;
-        int pwdCount = 0;
-        auto *pwdList = new uint64_t [numPassword];
-        while (getline(passwordsFile, pwd) && pwdCount < numPassword) {   // legge il file riga per riga
-            pwdList[pwdCount] = toUint64_T(pwd);                  // converte ogni parola in uint64_t
-            pwdCount++;
-        }
-        passwordsFile.close();
+        // Crea un vettore (pwdList) con tutte le password del file
+            ifstream passwordsFile(passwordPath);   // apro il file delle password
+            string pwd;                             // pwd: una password
+            int pwdCount = 0;                       // pwdCount: contatore delle password
+            auto *pwdList = new uint64_t [pwdNum];  // pwdList: è una lista che conterrà tutte le password del file
+            while (getline(passwordsFile, pwd) && pwdCount < pwdNum) {   // legge il file riga per riga
+                pwdList[pwdCount] = toUint64_T(pwd);                           // converte ogni password in uint64_t e la aggiunge alla lista
+                pwdCount++;
+            }
+            passwordsFile.close();
 
         // Generazione set di test
-        random_device rd;           // a seed source for the random number engine
-        mt19937 gen(rd());      // mersenne_twister_engine seeded with rd()
-        uniform_int_distribution<> distrib(0, numPassword);
-
-        vector<uint64_t*> tests;    // lista degli hash (password da craccare)
-        // sceglie a caso, secondo una distribuzione uniforme, una password dal dizionario
-        // la cifra con DES, ottendo così gli hash da craccare
-        for(int idTest = 0; idTest < nTests; idTest++){    // per ogni test fino a nTests
-            auto test = new uint64_t[nCrack];
-            for (int i = 0; i < nCrack; i++){
-                test[i] = desEncrypt(key, pwdList[distrib(gen)]);
+            random_device rd;           // a seed source for the random number engine
+            mt19937 gen(rd());      // mersenne_twister_engine seeded with rd()
+            uniform_int_distribution<> distrib(0, pwdNum);
+            vector<uint64_t*> tests;    // lista degli hash (password cifrate)
+            // La procedura è ripetuta numTests (10) volte, quindi avrò 10 test ciascuno con 1000 pwd cifrate
+            for(int idTest = 0; idTest < numTests; idTest++){
+                auto test = new uint64_t[numCrack];     // è un array che contiene numCrack password da craccare
+                // Dal file sceglie a caso, secondo una distribuzione uniforme, 1000 pwd dal dizionario (pwdList) e si cifrano (desEncrypt)
+                for (int i = 0; i < numCrack; i++){
+                    test[i] = desEncrypt(key, pwdList[distrib(gen)]);
+                }
+                tests.push_back(test);
             }
-            tests.push_back(test);
-        }
+
+            /*cout << "\n------------------ DEBUG: contenuto dei test ------------------\n";
+            for (int idTest = 0; idTest < tests.size(); idTest++) {
+                cout << "Test #" << idTest << ":\n";
+                uint64_t* test = tests[idTest];
+                for (int i = 0; i < numCrack; i++) {
+                    cout << "  test[" << i << "] = " << test[i] << "\n";
+                }
+                cout << "--------------------------------------------------------------\n";
+            }*/
 
 
         cout << "------------------ Experiments parameters ------------------";
-        cout << "\nSearch space: " << numPassword;
-        cout << "\nPasswords lengths: " << length;
-        cout << "\nNumber of passwords to crack: " << nCrack;
+        cout << "\nNumber of password in the dictionary: " << pwdNum;
+        cout << "\nPasswords lengths (bit): " << pwdLength;
+        cout << "\nNumber of passwords to crack: " << numCrack;
+        cout << "\nNumber of tests: " << numTests;
         cout << "\nBlock sizes to test: " << toString<int>(blockSizes);
-        cout << "\nNumber of tests for each experiment: " << nTests;
 
 
         cout << "\n------------------ Sequential Experiment ------------------\n";
-        vector<double> sTimes = {};
-        for (auto &pwdToCrack: tests) {    // per ogni password da craccare
-            cout << "Test started " << endl;
-            auto start = system_clock::now();
+            vector<double> sequentialTimes = {};
 
-            for (int i = 0; i < nCrack; i++){
-                for (int j = 0; j < numPassword; j++){    // prova tutte le N password del dizionario
-                    if (pwdToCrack[i] == desEncrypt(key, pwdList[j]))   // le cifra e le confronta
-                        break;
+            // Per ogni test in tests, mi prendo le password cifrate e le metto in pwdToCrack
+            for (auto &pwdToCrack: tests) {
+                cout << "Test started " << endl;
+                auto start = system_clock::now();
+
+                // per ogni password da decifrare in pwdToCrack (in totale sono numCrack)
+                for (int i = 0; i < numCrack; i++){
+                    // scorri tutto il dizionario fino a quando non trovi un match
+                    for (int j = 0; j < pwdNum; j++){
+                        // le cifra e le confronta la versione cifrata, se coincidono gli hash ho fatto
+                        if (pwdToCrack[i] == desEncrypt(key, pwdList[j]))
+                            break;
+                    }
                 }
-            }
 
-            auto end = system_clock::now();
-            auto seqElapsed = duration_cast<milliseconds>(end - start);
-            sTimes.push_back((double)seqElapsed.count());
-            printf("Passwords cracked ( %f ms)\n", sTimes.back());
-        }
-        double sAvg = accumulate(sTimes.begin(), sTimes.end(), 0.0) / (double)sTimes.size();
-        printf("Average time per experiment (ms): %4.2f\n", sAvg);
+                auto end = system_clock::now();
+                auto seqElapsed = duration_cast<milliseconds>(end - start);
+                sequentialTimes.push_back((double)seqElapsed.count());
+                printf("Passwords cracked (%f ms)\n", sequentialTimes.back());
+            }
+            double sequentialAvg = accumulate(sequentialTimes.begin(), sequentialTimes.end(), 0.0) / (double)sequentialTimes.size();
+            printf("\nAverage time per experiment (ms): %4.2f\n", sequentialAvg);
 
 
         cout << "\n------------------ Parallel Experiment ------------------\n";
-        vector<double> pAvg = {};
-        vector<double> speedUps = {};
-        for (auto &blockSize: blockSizes) {      // per ciascun valore di blockSize (32, 64, 126, 256)
-            printf("Block size: %d\n", blockSize);
-            vector<double> pTimes = {};
+            vector<double> parallelAvg = {};
+            vector<double> speedUps = {};
 
-            for (auto &test: tests) {       // per ogni password da craccare
-                cout << "Test started" << endl;
-                bool *found;
-                auto start = system_clock::now();
+            for (auto &blockSize: blockSizes) {
+                printf("------------- Block size: %d -------------\n", blockSize);
+                vector<double> parallelTimes = {};
 
-                found = parallelCrack(pwdList, numPassword, test, nCrack, key, blockSize);
+                for (auto &pwdToCrack: tests) {
+                    cout << "Test started" << endl;
+                    bool *found;
+                    auto start = system_clock::now();
 
-                auto end = system_clock::now();
-                auto parElapsed = duration_cast<milliseconds>(end - start);
-                pTimes.push_back((double)parElapsed.count());
-                printf("Passwords cracked ( %f ms)\n", pTimes.back());
+                    found = parallelCrack(pwdList, pwdNum, pwdToCrack, numCrack, key, blockSize);
 
-                for(int i = 0; i < nCrack; i++){
-                    if (!found[i])
-                        printf("Error occurred");
+                    auto end = system_clock::now();
+                    auto parallelElapsed = duration_cast<milliseconds>(end - start);
+                    parallelTimes.push_back((double)parallelElapsed.count());
+                    printf("Passwords cracked (%f ms)\n", parallelTimes.back());
+
+                    for(int i = 0; i < numCrack; i++){
+                        if (!found[i])
+                            printf("Error occurred");
+                    }
+
+                    free(found);
                 }
+                parallelAvg.push_back(accumulate(parallelTimes.begin(), parallelTimes.end(), 0.0) / (double)parallelTimes.size());
+                speedUps.push_back(sequentialAvg / parallelAvg.back());
+                printf("\nAverage time per block size = %d: %4.2f \n", blockSize, parallelAvg.back());
+                printf("Speedup: %4.2fx\n\n", speedUps.back());
 
-                free(found);
             }
-            pAvg.push_back(accumulate(pTimes.begin(), pTimes.end(), 0.0) / (double)pTimes.size());
-            speedUps.push_back(sAvg / pAvg.back());
-            printf("\nAverage time per block size = %d: %4.2f \n", blockSize, pAvg.back());
-            printf("\nSpeedup: %4.2fx\n", speedUps.back());
-
-        }
-        cout << "\nAverage time per experiments (ms): " << toString<double>(pAvg);
-        cout << "\nSpeedups: " << toString<double>(speedUps);
+            cout << "\nAverage time per experiments (ms): " << toString<double>(parallelAvg);
+            cout << "\nSpeedups: " << toString<double>(speedUps) << "\n";
 
 
         if (saveResults){
             ofstream resultsFile(resultsPath);  // crea e/o apre il file dei risultati
             resultsFile << "------------------ Experiments parameters ------------------";
-            resultsFile << "\nSearch space: " << numPassword;
-            resultsFile << "\nPasswords lengths: " << length;
-            resultsFile << "\nNumber of passwords to crack: " << nCrack;
-            resultsFile << "\nNumber of tests for each experiment: " << nTests;
+            resultsFile << "\nSearch space: " << pwdNum;
+            resultsFile << "\nPasswords lengths: " << pwdLength;
+            resultsFile << "\nNumber of passwords to crack: " << numCrack;
+            resultsFile << "\nNumber of tests for each experiment: " << numTests;
             resultsFile << "\n------------------ Sequential Experiment ------------------";
-            resultsFile << "\nAverage time per experiment (ms): " << sAvg;
+            resultsFile << "\nAverage time per experiment (ms): " << sequentialAvg;
             resultsFile << "\n------------------ Parallel Experiment ------------------";
             resultsFile << "\nBlock sizes tested: " << toString(blockSizes);
-            resultsFile << "\nAverage time per experiments (ms): " << toString(pAvg);
+            resultsFile << "\nAverage time per experiments (ms): " << toString(parallelAvg);
             resultsFile << "\nSpeedups: " << toString(speedUps);
         }
         free(pwdList);
     } else {
         // Altrimenti genera il dizionario
-        vector<string> passwords = passwordsGeneration(numPassword, length);
+        vector<string> passwords = passwordsGeneration(pwdNum, pwdLength);
         ofstream passwordsFile(passwordPath);
 
         for(const auto& password : passwords){

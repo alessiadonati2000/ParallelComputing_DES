@@ -29,47 +29,51 @@ uint64_t feistelFunction(uint64_t subkey, uint64_t bits){
     return permute<HALF_BLOCK, HALF_BLOCK>(exp, permutation);
 }
 
-uint64_t desEncrypt(uint64_t key56, uint64_t message){
+uint64_t desEncrypt(uint64_t key64, uint64_t plaintext){
     // Permutazione iniziale
-    uint64_t ip = permute<BLOCK, BLOCK>(message, initialPerm);
+    uint64_t initialPermutation = permute<BLOCK, BLOCK>(plaintext, initialPerm);
 
     // Divido in due parti il testo (ciascuno da 32 bit)
-    uint32_t lhs = (ip >> HALF_BLOCK),
-             rhs = ip;
+    uint32_t left = (initialPermutation >> HALF_BLOCK),
+             right = initialPermutation;
 
     // Preparazione della chiave
     // la chiave viene ridotta da 64 bit a 56 bit con permutedChoice1
     // e viene divisa un due parti da 28 bit
-    key56 = permute<BLOCK, 56>(key56, permutedChoice1);
-    uint32_t lhs_rk = (key56 >> 28) & 0xfffffff;
-    uint32_t rhs_rk = (key56) & 0xfffffff;
+    uint64_t key56 = permute<BLOCK, 56>(key64, permutedChoice1);
+    uint32_t leftRoundKey = (key56 >> 28) & 0xfffffff;
+    uint32_t rightRoundKey = (key56) & 0xfffffff;
 
     // Per ogni round (fino a 16)
     for(int shift : keyShiftArray){
+        // rotazione dei 28 bit
+        leftRoundKey = (leftRoundKey << shift) | (leftRoundKey >> (28 - shift));
+        rightRoundKey = (rightRoundKey << shift) | (rightRoundKey >> (28 - shift));
 
-        // ruota i 28 bit delle chiavi secondo lo schedule (keyShiftArray)
-        lhs_rk = (lhs_rk << shift) | (lhs_rk >> (28 - shift));
-        rhs_rk = (rhs_rk << shift) | (rhs_rk >> (28 - shift));
-        lhs_rk &= 0xfffffff;
-        rhs_rk &= 0xfffffff;
-        uint64_t roundKey = (uint64_t(lhs_rk) << 28) | rhs_rk;
-        // ricostruisce una chiave a 56 bit e la riduce a 48 bit con permutedChoice2
+        // mascheratura a 28 bit
+        leftRoundKey &= 0xfffffff;
+        rightRoundKey &= 0xfffffff;
+
+        // ricostruzione della chiave a 56 bit
+        uint64_t roundKey = (uint64_t(leftRoundKey) << 28) | rightRoundKey;
+
+        // Riduce a 48 bit con permutedChoice2
         roundKey = permute<56, ROUND_KEY>(roundKey, permutedChoice2);
 
         // calcola la funzione di Feistel su rhs
-        uint64_t feistel = feistelFunction(roundKey, rhs);
+        uint64_t feistel = feistelFunction(roundKey, right);
 
         // aggiorna le due metà chiave con lo schema classico Feistel
-        auto old_lhs = lhs;
-        lhs = rhs;
-        rhs = old_lhs ^ feistel;
+        auto old_lhs = left;
+        left = right;
+        right = old_lhs ^ feistel;
 
     }
 
     // scambio le due metà
-    message = (uint64_t(rhs) << HALF_BLOCK) | lhs;
+    plaintext = (uint64_t(right) << HALF_BLOCK) | left;
 
     // permutazione finale
-    ip = permute<BLOCK, BLOCK>(message, finalPerm);
-    return ip; // testo cifrato a 64 bit
+    initialPermutation = permute<BLOCK, BLOCK>(plaintext, finalPerm);
+    return initialPermutation; // testo cifrato a 64 bit
 }

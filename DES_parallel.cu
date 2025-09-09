@@ -26,7 +26,7 @@ __constant__ int keyShiftArray_p[ROUNDS];
 
 // Funzione host (chiamata da CPU) parallelCrack: prepara i dati e lancia il kernel
 __host__
-bool * parallelCrack(uint64_t *pwdList, int N, uint64_t *pwdToCrack, int nCrack, uint64_t key, int blockSize){
+bool * parallelCrack(uint64_t *pwdList, int N, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize){
     // copia le tabelle in constant memory
     cudaMemcpyToSymbol(initialPerm_p, initialPerm, sizeof(int) * BLOCK);
     cudaMemcpyToSymbol(finalPerm_p, finalPerm, sizeof(int) * BLOCK);
@@ -48,26 +48,26 @@ bool * parallelCrack(uint64_t *pwdList, int N, uint64_t *pwdToCrack, int nCrack,
     uint64_t *pwdList_p, *pwdToCrack_p;
     cudaMalloc((void **)&pwdList_p, N * sizeof(uint64_t));
     cudaMemcpy(pwdList_p, pwdList, N*sizeof(uint64_t), cudaMemcpyHostToDevice);
-    cudaMalloc((void **) &pwdToCrack_p, nCrack * sizeof(uint64_t));
-    cudaMemcpy(pwdToCrack_p, pwdToCrack, nCrack * sizeof(uint64_t), cudaMemcpyHostToDevice);
+    cudaMalloc((void **) &pwdToCrack_p, numCrack * sizeof(uint64_t));
+    cudaMemcpy(pwdToCrack_p, pwdToCrack, numCrack * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
     // alloca array found su device (per marcare quali password sono state trovate
     bool *found_p;
-    cudaMalloc((void **) &found_p, nCrack * sizeof(bool));
-    cudaMemset(found_p, 0, nCrack * sizeof(bool));
+    cudaMalloc((void **) &found_p, numCrack * sizeof(bool));
+    cudaMemset(found_p, 0, numCrack * sizeof(bool));
 
     // lancia il kernel
     // numero di blocchi: (N + blockSize - 1) / blockSize
     // ogni thread cifra una password del dizionaio
-    kernelCrack<<<(N + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, N, pwdToCrack_p, nCrack, found_p, key);
+    kernelCrack<<<(N + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, N, pwdToCrack_p, numCrack, found_p, key);
     auto err = cudaGetLastError();
     if (err != cudaSuccess){
         printf("\n### %s: %s ###\n", cudaGetErrorName(err), cudaGetErrorString(err));
     }
 
     // copia i risultati indietro
-    bool *found = new bool[nCrack];
-    cudaMemcpy(found, found_p, nCrack * sizeof(bool), cudaMemcpyDeviceToHost);
+    bool *found = new bool[numCrack];
+    cudaMemcpy(found, found_p, numCrack * sizeof(bool), cudaMemcpyDeviceToHost);
 
     // libera la memoria GPU
     cudaFree(pwdList_p);
