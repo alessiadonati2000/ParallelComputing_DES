@@ -10,11 +10,32 @@
 #include "utility.h"      // per funzioni di utilità
 #include "DES.h"        // per DES lato CPU
 #include "DES_parallel.cuh"    // per DES lato CUDA
+#include <cuda_runtime.h>
 using namespace constants;
 using namespace std;
 using namespace chrono;
 
 int main() {
+    // Verifica problemi CUDA
+    int deviceCount = 0;
+    cudaError_t err = cudaGetDeviceCount(&deviceCount);
+    fprintf(stdout, "cudaGetDeviceCount -> %d, err=%d (%s)\n",
+            deviceCount, (int)err,
+            (cudaGetErrorString(err) ? cudaGetErrorString(err) : "NULL"));
+
+    if (deviceCount > 0) {
+        cudaDeviceProp prop;
+        if (cudaGetDeviceProperties(&prop, 0) == cudaSuccess) {
+            fprintf(stdout, "Device 0: %s  computeCapability=%d.%d  totalGlobalMem=%zuMB\n",
+                    prop.name, prop.major, prop.minor, (size_t)(prop.totalGlobalMem / (1024*1024)));
+        } else {
+            fprintf(stderr, "cudaGetDeviceProperties failed\n");
+        }
+    } else {
+        fprintf(stderr, "No CUDA devices found or initialization failed.\n");
+    }
+
+
     // Dizionario delle password
         string passwordPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\password.txt)";
 
@@ -29,7 +50,7 @@ int main() {
     // Parametri dell'esperimento
         bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
         bool saveResults = true;                        // salva su file i risultati
-        int pwdNum = 100000;                            // grandezza del dizionario
+        int pwdNum = 1000;                            // grandezza del dizionario
         int pwdLength = 8;                              // lunghezza delle password
         int numCrack = 1000;                            // numero di password da craccare
         int numTests = 10;                              // ripetizioni dell'esperimento
@@ -44,6 +65,7 @@ int main() {
             string pwd;                             // pwd: una password
             int pwdCount = 0;                       // pwdCount: contatore delle password
             auto *pwdList = new uint64_t [pwdNum];  // pwdList: è una lista che conterrà tutte le password del file
+
             while (getline(passwordsFile, pwd) && pwdCount < pwdNum) {   // legge il file riga per riga
                 pwdList[pwdCount] = toUint64_T(pwd);                           // converte ogni password in uint64_t e la aggiunge alla lista
                 pwdCount++;
@@ -53,7 +75,7 @@ int main() {
         // Generazione set di test
             random_device rd;           // a seed source for the random number engine
             mt19937 gen(rd());      // mersenne_twister_engine seeded with rd()
-            uniform_int_distribution<> distrib(0, pwdNum);
+            uniform_int_distribution<> distrib(0, pwdNum-1);
             vector<uint64_t*> tests;    // lista degli hash (password cifrate)
             // La procedura è ripetuta numTests (10) volte, quindi avrò 10 test ciascuno con 1000 pwd cifrate
             for(int idTest = 0; idTest < numTests; idTest++){
@@ -64,16 +86,6 @@ int main() {
                 }
                 tests.push_back(test);
             }
-
-            /*cout << "\n------------------ DEBUG: contenuto dei test ------------------\n";
-            for (int idTest = 0; idTest < tests.size(); idTest++) {
-                cout << "Test #" << idTest << ":\n";
-                uint64_t* test = tests[idTest];
-                for (int i = 0; i < numCrack; i++) {
-                    cout << "  test[" << i << "] = " << test[i] << "\n";
-                }
-                cout << "--------------------------------------------------------------\n";
-            }*/
 
 
         cout << "------------------ Experiments parameters ------------------";
@@ -162,7 +174,7 @@ int main() {
             resultsFile << "\nAverage time per experiments (ms): " << toString(parallelAvg);
             resultsFile << "\nSpeedups: " << toString(speedUps);
         }
-        free(pwdList);
+        //free(pwdList);
     } else {
         // Altrimenti genera il dizionario
         vector<string> passwords = passwordsGeneration(pwdNum, pwdLength);

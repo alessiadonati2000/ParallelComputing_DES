@@ -3,25 +3,26 @@
 #include "utility.h"
 using namespace constants;
 
-uint64_t feistelFunction(uint64_t subkey, uint64_t bits){
+uint64_t feistelFunction(uint64_t subkey, uint64_t right){
+    int numSBlock = 7;
     // Espansione (E-box)
     // bits è la metà destra del blocco (32 bit), viene espansa a 48 bit tramite la tabella expansion
-    uint64_t exp = permute<HALF_BLOCK, ROUND_KEY>(bits, expansion);
+    uint64_t exp = permute<HALF_BLOCK, ROUND_KEY>(right, expansion);
 
     // XOR
     // fa lo XOR tra la subkey di questo round e i bit espansi
-    subkey = subkey ^ exp;
+    uint64_t xored = subkey ^ exp;
 
     // Sostituzione (S-box)
     // i 48 bit vengono divisi in 8 blocchi da 6 bit
     // ogni blocco passa in una S-box, una tabella non lineare che restituisce 4 bit
     // viene ricostruito il blocco da 32 bit
     exp = 0;
-    for(int j = 8-1; j >= 0; j--){
-        uint8_t block = (subkey >> (j) * 6);
+    for(int j = numSBlock; j >= 0; j--){
+        uint8_t block = (xored >> (j) * 6);
         auto row = ((block & 0b100000) >> 4) | (block & 1);
         auto col = (block & 0b011110) >> 1;
-        exp |= uint32_t(hS[8 - 1 - j][row * 16 + col]) << ((j) * 4);
+        exp |= uint32_t(S[8 - 1 - j][row * 16 + col]) << ((j) * 4);
     }
 
     // Permutazione (P-box)
@@ -50,7 +51,7 @@ uint64_t desEncrypt(uint64_t key64, uint64_t plaintext){
         leftRoundKey = (leftRoundKey << shift) | (leftRoundKey >> (28 - shift));
         rightRoundKey = (rightRoundKey << shift) | (rightRoundKey >> (28 - shift));
 
-        // mascheratura a 28 bit
+        // mascheratura a 28 bit, per essere sicuri che solo i primi 28 bit siano significativi
         leftRoundKey &= 0xfffffff;
         rightRoundKey &= 0xfffffff;
 
@@ -63,10 +64,10 @@ uint64_t desEncrypt(uint64_t key64, uint64_t plaintext){
         // calcola la funzione di Feistel su rhs
         uint64_t feistel = feistelFunction(roundKey, right);
 
-        // aggiorna le due metà chiave con lo schema classico Feistel
-        auto old_lhs = left;
+        // aggiorna le due metà testo con lo schema classico Feistel
+        auto old_left = left;
         left = right;
-        right = old_lhs ^ feistel;
+        right = old_left ^ feistel;
 
     }
 
@@ -74,6 +75,6 @@ uint64_t desEncrypt(uint64_t key64, uint64_t plaintext){
     plaintext = (uint64_t(right) << HALF_BLOCK) | left;
 
     // permutazione finale
-    initialPermutation = permute<BLOCK, BLOCK>(plaintext, finalPerm);
-    return initialPermutation; // testo cifrato a 64 bit
+    uint64_t ciphertext = permute<BLOCK, BLOCK>(plaintext, finalPerm);
+    return ciphertext; // testo cifrato a 64 bit
 }
