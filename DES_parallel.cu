@@ -2,9 +2,6 @@
 #include "DES_parallel.cuh"
 
 // Costanti globabli su GPU: tabelle statiche DES
-// calls to cudaMemcpyToSymbol() have to reside in the same file where the constant data is defined.
-// vivono nella constant memory della GPU: memoria veloce (cache dedicata)
-// ideale quando tutti i thread leggono gli stessi valori
 __constant__ int initialPerm_p[BLOCK];
 __constant__ int finalPerm_p[BLOCK];
 __constant__ int expansion_p[ROUND_KEY];
@@ -24,10 +21,10 @@ __constant__ int permutedChoice2_p[ROUND_KEY];
 __constant__ int keyShiftArray_p[ROUNDS];
 
 
-// Funzione host (chiamata da CPU) parallelCrack: prepara i dati e lancia il kernel
+// Funzione host (chiamata da CPU): prepara i dati e lancia il kernel
 __host__
 bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize){
-    // copia le tabelle in constant memory, è molto veloce quando TUTTI i thread leggono gli stessi valori
+    // Copia le tabelle in constant memory
     cudaMemcpyToSymbol(initialPerm_p, initialPerm, sizeof(int) * BLOCK);
     cudaMemcpyToSymbol(finalPerm_p, finalPerm, sizeof(int) * BLOCK);
     cudaMemcpyToSymbol(expansion_p, expansion, sizeof(int) * ROUND_KEY);
@@ -44,31 +41,22 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
     cudaMemcpyToSymbol(permutedChoice2_p, permutedChoice2, sizeof(int) * ROUND_KEY);
     cudaMemcpyToSymbol(keyShiftArray_p, keyShiftArray, sizeof(int) * ROUNDS);
 
-    // alloca e copia i dati del dizionario e delle password target in memoria globale GPU
+    // Alloca e copia i dati del dizionario, delle password target e found in memoria globale GPU
     uint64_t *pwdList_p, *pwdToCrack_p;
     bool *found_p;
 
-    // dizionario
     cudaMalloc((void **) &pwdList_p, pwdNum * sizeof(uint64_t));
     cudaMemcpy(pwdList_p, pwdList, pwdNum * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
-    // testi cifrati
     cudaMalloc((void **) &pwdToCrack_p, numCrack * sizeof(uint64_t));
     cudaMemcpy(pwdToCrack_p, pwdToCrack, numCrack * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
-    // alloca array found su device (per marcare quali password sono state trovate
     cudaMalloc((void **) &found_p, numCrack * sizeof(bool));
     cudaMemset(found_p, 0, numCrack * sizeof(bool));
 
-    // lancia il kernel
-    // numero di blocchi: (N + blockSize - 1) / blockSize
-    // ogni thread cifra una password del dizionaio e la confronta con tutti i target
+    // Ogni thread cifra una password del dizionario e la confronta con tutti i target
     kernelCrack<<<(pwdNum + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, pwdNum, pwdToCrack_p, numCrack, found_p, key);
-    /*auto err = cudaGetLastError();
-    if (err != cudaSuccess){
-        printf("\n### %s: %s ###\n", cudaGetErrorName(err), cudaGetErrorString(err));
-    }*/
-    // Controllo immediato dell'errore di launch
+
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA launch error (code=%d): %s\n", (int)err,
@@ -84,10 +72,11 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
         fprintf(stdout, "Kernel completed successfully (synchronized)\n");
     }
 
-    // copia i risultati indietro
+    // Copia i risultati indietro
     bool *found = (bool*)malloc(numCrack * sizeof(bool));
     cudaMemcpy(found, found_p, numCrack * sizeof(bool), cudaMemcpyDeviceToHost);
-    // libera la memoria GPU
+
+    // Libera la memoria GPU
     cudaFree(pwdList_p);
     cudaFree(pwdToCrack_p);
     cudaFree(found_p);
@@ -96,21 +85,19 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
 }
 
 
-// Kernel kernelCrack: ogni thread cifra una password e la confronta con quelle da crackare
+// Kernel: ogni thread cifra una password e la confronta con quelle da criptate
 __global__
 void kernelCrack(const uint64_t *pwdList, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found, uint64_t key) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;    // codice identificativo del thread
-    // il dizionario ha N password
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < pwdNum){
-        // prende una password(pwdList[tid] e la cifra con DES (d_desEncrypt)
         uint64_t pwdEncrypt = desEncrypt_p(key, pwdList[tid]);
-        // Confronta con tutte le nCrack password target
+
         for(int i = 0; i < numCrack; i++){
             if (!found[i] && pwdEncrypt == pwdToCrack[i]){
-                found[i] = true;    // ha trovato una corrispondenza
-                //printf("Thread-%d found password %d\n", tid, i); //era commentato
+                found[i] = true;
             }
         }
+
     }
 }
 
@@ -118,14 +105,11 @@ void kernelCrack(const uint64_t *pwdList, int pwdNum, const uint64_t *pwdToCrack
 __device__
 uint64_t feistelFunction_p(const uint64_t subkey, const uint64_t right){
     int numSBlock = 7;
-    // Expansion
     uint64_t exp = permute_p<HALF_BLOCK, ROUND_KEY>(right, expansion_p);
 
-    // Key mixing
     uint64_t xored = subkey ^ exp;
 
-    // Substitution
-    exp = 0;
+     exp = 0;
     for(int j = numSBlock; j >= 0; j--){
         uint8_t block = (xored >> (j) * 6);
         auto row = ((block & 0b100000) >> 4) | (block & 1);
@@ -137,17 +121,13 @@ uint64_t feistelFunction_p(const uint64_t subkey, const uint64_t right){
 }
 
 
-// è la copia della versione CPU
 __device__ //chiamabile solo da funzioni CUDA
 uint64_t desEncrypt_p(uint64_t key64, const uint64_t plaintext){
-    // Initial permutation
     uint64_t initialPermutation = permute_p<BLOCK, BLOCK>(plaintext, initialPerm_p);
-    // Split in two halves
+
     uint32_t left = (initialPermutation >> HALF_BLOCK),
             right = initialPermutation;
 
-
-    // Rounds, with subkey generation
     uint64_t key56 = permute_p<BLOCK, 56>(key64, permutedChoice1_p);
     uint32_t leftRoundKey = (key56 >> 28) & 0xfffffff;
     uint32_t rightRoundKey = (key56) & 0xfffffff;
@@ -163,7 +143,6 @@ uint64_t desEncrypt_p(uint64_t key64, const uint64_t plaintext){
 
         roundKey = permute_p<56, ROUND_KEY>(roundKey, permutedChoice2_p);
 
-
         uint64_t feistel = feistelFunction_p(roundKey, right);
 
         auto old_left = left;
@@ -173,7 +152,6 @@ uint64_t desEncrypt_p(uint64_t key64, const uint64_t plaintext){
     }
     uint64_t result = (uint64_t(right) << HALF_BLOCK) | left;
 
-    // Final permutation
     uint64_t ciphertext = permute_p<BLOCK, BLOCK>(result, finalPerm_p);
 
     return ciphertext;

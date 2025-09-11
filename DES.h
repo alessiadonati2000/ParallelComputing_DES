@@ -1,9 +1,6 @@
-// header file
 #ifndef DES_DES_H
 #define DES_DES_H
 #include <cstdint>
-#include <string>
-#include <vector>
 
 using namespace std;
 

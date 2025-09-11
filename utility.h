@@ -4,15 +4,14 @@
 #include <string>
 #include <random>
 
-#define BLOCK 64        // dimensione blocco in bit
-#define HALF_BLOCK 32   // metà blocco
-#define ROUND_KEY 48    // lunghezza subkey per round
-#define ROUNDS 16       // numero di roud DES
+#define BLOCK 64
+#define HALF_BLOCK 32
+#define ROUND_KEY 48
+#define ROUNDS 16
 
 using namespace std;
 namespace constants
 {
-    // insieme di caratteri usato per generare le password casuali
     const char charSet[64] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
                               'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
                               'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '!'};
@@ -143,28 +142,31 @@ namespace constants
 
 }
 
-// Genera N parole casuali di lunghezza length
+// Genera numPassword parole casuali di lunghezza length
 static vector<string> passwordsGeneration(int numPassword, int length){
-    random_device rd;  // a seed source for the random number engine
-    mt19937 gen(rd()); // mersenne_twister_engine seeded with rd()
+    random_device rd;
+    mt19937 gen(rd());
     uniform_int_distribution<> distrib(0, 63);
     vector<string> passwords;
+
     for( int i = 0; i < numPassword; i++){
-        string s;
+        string str;
         for(int j = 0; j < length; j++){
-            s += constants::charSet[distrib(gen)];
+            str += constants::charSet[distrib(gen)];
         }
-        passwords.push_back(s);
+        passwords.push_back(str);
     }
+
     return passwords;
 }
 
 // Converte una stringa max 8 caratteri in un intero 64 bit
-static uint64_t toUint64_T(const string &s){
+static uint64_t toUint64_T(const string &str){
     uint64_t result = 0;
-    if (s.length() <= 8){
-        for (int i = 0; i < s.length(); i++){
-            result = result << 8 | s[i];
+
+    if (str.length() <= 8){
+        for (int i = 0; i < str.length(); i++){
+            result = result << 8 | str[i];
         }
     } else
         printf("String is too long, maximum 8 characters");
@@ -172,17 +174,18 @@ static uint64_t toUint64_T(const string &s){
     return result;
 }
 
-
 template<typename T>
 static string toString(const vector<T>& v) {
-    string s = "[";
+    string str = "[";
+
     for(int i = 0; i < v.size(); i++){
-        s += to_string(v[i]);
+        str += to_string(v[i]);
         if (i < v.size() - 1)
-            s += ", ";
+            str += ", ";
         else
-            s += "]";
+            str += "]";
     }
-    return s;
+
+    return str;
 }
 #endif //DES_UTILS_H

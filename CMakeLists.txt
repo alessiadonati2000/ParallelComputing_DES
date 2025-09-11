@@ -1,20 +1,21 @@
-cmake_minimum_required(VERSION 3.28)    # server la versione 3.28 di CMake
-project(DES LANGUAGES C CXX CUDA)       # nome del progetto: DES # linguaggi utilizzati: C, C++, CUDA
-find_package(CUDAToolkit REQUIRED)      # ricerca del toolkit CUDA
+cmake_minimum_required(VERSION 3.28)
+project(DES LANGUAGES C CXX CUDA)
+find_package(CUDAToolkit REQUIRED)
 include_directories(C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.5/include)
-set(CMAKE_CUDA_STANDARD 17)             # imposta lo standard a C++ 17
+set(CMAKE_CUDA_STANDARD 17)
 
 add_executable(DES    # crea un eseguibile chiamato DES compilando
-        main.cu       # main del programma
-        utility.h     # funzioni di supporto
-        DES_parallel.cu      # codice CUDA
+        main.cu             # main del programma
+        utility.h           # funzioni di supporto
+        DES_parallel.cu     # codice CUDA
         DES_parallel.cuh
-        DES.cpp       # implementazione CPU
+        DES.cpp             # implementazione CPU
         DES.h
 )
 
+# viene tutto compilato in un unico passaggio
 set_target_properties(DES PROPERTIES
-        CUDA_SEPARABLE_COMPILATION OFF)    # viene tutto compilato in un unico passaggio
+        CUDA_SEPARABLE_COMPILATION OFF)
 
 # il compilatore CUDA stampa informazioni dettagliate sull'uso di risorse GPU
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --ptxas-options=-v")
