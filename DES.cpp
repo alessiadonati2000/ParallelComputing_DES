@@ -14,10 +14,10 @@ uint64_t feistelFunction(uint64_t subkey, uint64_t right){
     // Sostituzione (S-box)
     exp = 0;
     for(int j = numSBlock; j >= 0; j--){
-        uint8_t block = xored >> j * 6;
-        auto row = (block & 0b100000) >> 4 | block & 1;
+        uint8_t block = (xored >> (j) * 6);
+        auto row = ((block & 0b100000) >> 4) | (block & 1);
         auto col = (block & 0b011110) >> 1;
-        exp |= uint32_t(S[8 - 1 - j][row * 16 + col]) << (j * 4);
+        exp |= uint32_t(S[8 - 1 - j][row * 16 + col]) << ((j) * 4);
     }
 
     // Permutazione (P-box)

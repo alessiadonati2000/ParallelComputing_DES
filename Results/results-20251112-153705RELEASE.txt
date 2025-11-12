@@ -1,0 +1,21 @@
+========================================================
+           PARAMETRI DELL'ESPERIMENTO
+========================================================
+Numero password nel dizionario: 1000000
+Lunghezza password (caratteri): 8
+Password da decifrare per test: 10
+Numero di test da eseguire: 10
+Block size CUDA testati: [32, 64, 128, 256]
+--------------------------------------------------------
+
+========================================================
+                 SINTESI DEI RISULTATI
+========================================================
+Metodo               | Tempo Medio (ms)     | Speedup     
+-------------------- | -------------------- | ------------
+Sequenziale (CPU)    | 1258.00              | 1.00      x
+Parallelo (BS: 32)   | 112.80               | 11.15     x
+Parallelo (BS: 64)   | 7.00                 | 179.71    x
+Parallelo (BS: 128)  | 5.60                 | 224.64    x
+Parallelo (BS: 256)  | 6.40                 | 196.56    x
+========================================================

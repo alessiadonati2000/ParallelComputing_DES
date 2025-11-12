@@ -5,7 +5,7 @@
 using namespace constants;
 
 template<int FROM, int TO>
-__device__  // può essere chaimata solo da funzioni che girano su GPU
+__device__  // può essere chiamata solo da funzioni che girano su GPU
 auto permute_p(const uint64_t source,const int *table) -> uint64_t{
     uint64_t  p = 0;
     for(int i = 0; i < TO; i++){
@@ -13,6 +13,8 @@ auto permute_p(const uint64_t source,const int *table) -> uint64_t{
     }
     return p;
 }
+
+// MODIFICA: Restituisce int* invece di bool*
 __host__
 bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize);
 
@@ -22,6 +24,8 @@ uint64_t feistelFunction_p(uint64_t subkey, uint64_t right);
 __device__
 uint64_t desEncrypt_p(uint64_t key56, uint64_t plaintext);
 
+// MODIFICA: Riceve int* invece di bool*
 __global__
 void kernelCrack(const uint64_t *pwdList, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found, uint64_t key);
+
 #endif //DES_D_DES_CUH

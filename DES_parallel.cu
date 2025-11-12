@@ -43,7 +43,6 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
 
     // Alloca e copia i dati del dizionario, delle password target e found in memoria globale GPU
     uint64_t *pwdList_p, *pwdToCrack_p;
-    bool *found_p;
 
     cudaMalloc((void **) &pwdList_p, pwdNum * sizeof(uint64_t));
     cudaMemcpy(pwdList_p, pwdList, pwdNum * sizeof(uint64_t), cudaMemcpyHostToDevice);
@@ -51,29 +50,20 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
     cudaMalloc((void **) &pwdToCrack_p, numCrack * sizeof(uint64_t));
     cudaMemcpy(pwdToCrack_p, pwdToCrack, numCrack * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
+    bool *found_p;
     cudaMalloc((void **) &found_p, numCrack * sizeof(bool));
     cudaMemset(found_p, 0, numCrack * sizeof(bool));
 
     // Ogni thread cifra una password del dizionario e la confronta con tutti i target
     kernelCrack<<<(pwdNum + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, pwdNum, pwdToCrack_p, numCrack, found_p, key);
-
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA launch error (code=%d): %s\n", (int)err,
                 (cudaGetErrorString(err) ? cudaGetErrorString(err) : "cudaGetErrorString returned NULL"));
     }
 
-    // Synchronize per catturare eventuali errori di runtime del kernel
-    err = cudaDeviceSynchronize();
-    if (err != cudaSuccess) {
-        fprintf(stderr, "CUDA runtime error after kernel (code=%d): %s\n", (int)err,
-                (cudaGetErrorString(err) ? cudaGetErrorString(err) : "cudaGetErrorString returned NULL"));
-    } else {
-        fprintf(stdout, "Kernel completed successfully (synchronized)\n");
-    }
-
     // Copia i risultati indietro
-    bool *found = (bool*)malloc(numCrack * sizeof(bool));
+    bool *found = new bool[numCrack];
     cudaMemcpy(found, found_p, numCrack * sizeof(bool), cudaMemcpyDeviceToHost);
 
     // Libera la memoria GPU
@@ -97,7 +87,6 @@ void kernelCrack(const uint64_t *pwdList, int pwdNum, const uint64_t *pwdToCrack
                 found[i] = true;
             }
         }
-
     }
 }
 
