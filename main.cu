@@ -25,7 +25,7 @@ int main() {
     bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
     int pwdNum = 1000000;                           // grandezza del dizionario
     int pwdLength = 8;                              // lunghezza delle password
-    int numCrack = 1000;                             // numero di password da decifrare
+    int numCrack = 100;                             // numero di password da decifrare
     int numTests = 10;                              // ripetizioni dell'esperimento
     vector<int> blockSizes = {32, 64, 128, 256};    // block size CUDA da testare
     uint64_t key = toUint64_T("a2kvt8rz");    // chiave DES fissa per cifrare
@@ -77,17 +77,11 @@ int main() {
                 i++;
                 auto start = chrono::system_clock::now();
 
-                auto *encryptedDictionaryCPU = new uint64_t[pwdNum];
-                for (int j = 0; j < pwdNum; j++){
-                    encryptedDictionaryCPU[j] = desEncrypt(key, pwdList[j]);
-                }
-
                 // Ogni password del test (criptata) viene confrontata con le password del dizionario una ad una (che vengono qui criptate al volo)
                 // Se coincidono ho trovato la password
                 for (int i = 0; i < numCrack; i++){
                     for (int j = 0; j < pwdNum; j++){
-                        if (pwdToCrack[i] == encryptedDictionaryCPU[j]) {
-                            //cout << pwdToCrack[i] << "==" << encryptedDictionaryCPU[j] << endl;
+                        if (pwdToCrack[i] == desEncrypt(key, pwdList[j])) {
                             break;
                         }
                     }

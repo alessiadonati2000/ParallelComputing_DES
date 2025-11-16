@@ -14,7 +14,6 @@ auto permute_p(const uint64_t source,const int *table) -> uint64_t{
     return p;
 }
 
-// MODIFICA: Restituisce int* invece di bool*
 __host__
 bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize);
 
@@ -24,8 +23,12 @@ uint64_t feistelFunction_p(uint64_t subkey, uint64_t right);
 __device__
 uint64_t desEncrypt_p(uint64_t key56, uint64_t plaintext);
 
-// MODIFICA: Riceve int* invece di bool*
+// Kernel 1: Cifra l'intero dizionario
 __global__
-void kernelCrack(const uint64_t *pwdList, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found, uint64_t key);
+void kernelEncrypt(const uint64_t *pwdList, int pwdNum, uint64_t *encryptedDictionaryGPU, uint64_t key);
+
+// Kernel 2: Confronta il dizionario cifrato con le password target
+__global__
+void kernelCompare(const uint64_t *encryptedDictionaryGPU, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found);
 
 #endif //DES_D_DES_CUH

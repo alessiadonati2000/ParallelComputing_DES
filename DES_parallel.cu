@@ -55,7 +55,25 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
     cudaMemset(found_p, 0, numCrack * sizeof(bool));
 
     // Ogni thread cifra una password del dizionario e la confronta con tutti i target
-    kernelCrack<<<(pwdNum + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, pwdNum, pwdToCrack_p, numCrack, found_p, key);
+    //kernelCrack<<<(pwdNum + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, pwdNum, pwdToCrack_p, numCrack, found_p, key);
+
+        // 1. Alloca memoria per il dizionario cifrato su GPU
+        uint64_t *d_encryptedDictionary;
+        cudaMalloc(&d_encryptedDictionary, pwdNum * sizeof(uint64_t));
+
+        // 2. Lancia KERNEL 1 (Cifratura)
+        // Lanciamo 1.000.000 di thread (pwdNum)
+        int gridSizeEncrypt = (pwdNum + blockSize - 1) / blockSize;
+        kernelEncrypt<<<gridSizeEncrypt, blockSize>>>(pwdList_p, pwdNum, d_encryptedDictionary, key);
+
+        // 3. Lancia KERNEL 2 (Confronto)
+        // Lanciamo 10, 100 o 1000 thread (numCrack)
+        int gridSizeCompare = (numCrack + blockSize - 1) / blockSize;
+        kernelCompare<<<gridSizeCompare, blockSize>>>(d_encryptedDictionary, pwdNum, pwdToCrack_p, numCrack, found_p);
+
+        // 4. Sincronizza per essere sicuro che tutto sia finito
+        cudaDeviceSynchronize();
+
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA launch error (code=%d): %s\n", (int)err,
@@ -70,36 +88,54 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
     cudaFree(pwdList_p);
     cudaFree(pwdToCrack_p);
     cudaFree(found_p);
+    cudaFree(d_encryptedDictionary);
 
     return found;
 }
 
-
-// Kernel: ogni thread cifra una password e la confronta con quelle da criptate
+// KERNEL 1: Cifratura
+// Ogni thread (fino a pwdNum) cifra UNA password dal dizionario.
+// Esecuzione: 1.000.000 di thread in parallelo.
 __global__
-void kernelCrack(const uint64_t *pwdList, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found, uint64_t key) {
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+void kernelEncrypt(const uint64_t *pwdList, int pwdNum, uint64_t *encryptedDictionaryGPU, uint64_t key){
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < pwdNum){
-        uint64_t pwdEncrypt = desEncrypt_p(key, pwdList[tid]);
+        // Ogni thread cifra una sola password e salva il risultato
+        encryptedDictionaryGPU[tid] = desEncrypt_p(key, pwdList[tid]);
+    }
+}
 
-        for(int i = 0; i < numCrack; i++){
-            if (!found[i] && pwdEncrypt == pwdToCrack[i]){
-                found[i] = true;
+
+// KERNEL 2: Confronto
+// Ogni thread (fino a numCrack) cerca UNA password target nel dizionario.
+// Esecuzione: 10, 100 o 1000 thread in parallelo.
+__global__
+void kernelCompare(const uint64_t *encryptedDictionaryGPU, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found){
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    if (tid < numCrack){
+        // Prendo la "mia" password target
+        uint64_t myTarget = pwdToCrack[tid];
+
+        // Scorro l'intero dizionario cifrato cercandola
+        for (int i = 0; i < pwdNum; i++){
+            if (encryptedDictionaryGPU[i] == myTarget){
+                found[tid] = true;
+                break; // Trovata! Posso uscire dal loop.
             }
         }
+        // Se non la trovo, 'found[tid]' resta false (come inizializzato da cudaMemset)
     }
 }
 
 // Funzione device: implementazione DES e Feistel function su GPU
 __device__
 uint64_t feistelFunction_p(const uint64_t subkey, const uint64_t right){
-    int numSBlock = 7;
     uint64_t exp = permute_p<HALF_BLOCK, ROUND_KEY>(right, expansion_p);
 
     uint64_t xored = subkey ^ exp;
 
-     exp = 0;
-    for(int j = numSBlock; j >= 0; j--){
+    exp = 0;
+    for(int j = 8-1; j >= 0; j--){
         uint8_t block = (xored >> (j) * 6);
         auto row = ((block & 0b100000) >> 4) | (block & 1);
         auto col = (block & 0b011110) >> 1;
