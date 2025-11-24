@@ -14,10 +14,10 @@ add_executable(DES    # crea un eseguibile chiamato DES compilando
         DES.h
 )
 
-# viene tutto compilato in un unico passaggio
+# Viene tutto compilato in un unico passaggio
 set_target_properties(DES PROPERTIES
         CUDA_SEPARABLE_COMPILATION OFF)
 
-# il compilatore CUDA stampa informazioni dettagliate sull'uso di risorse GPU
+# Il compilatore CUDA stampa informazioni dettagliate sull'uso di risorse GPU
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --ptxas-options=-v")
 

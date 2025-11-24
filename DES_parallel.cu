@@ -20,8 +20,6 @@ __constant__ int permutedChoice1_p[56];
 __constant__ int permutedChoice2_p[ROUND_KEY];
 __constant__ int keyShiftArray_p[ROUNDS];
 
-
-// Funzione host (chiamata da CPU): prepara i dati e lancia il kernel
 __host__
 bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize){
 
@@ -92,7 +90,6 @@ void kernelCrack(const uint64_t *pwdList, int numPwd, const uint64_t *pwdToCrack
     }
 }
 
-// Funzione device: implementazione DES e Feistel function su GPU
 __device__
 uint64_t feistelFunction_p(const uint64_t subkey, const uint64_t right){
     uint64_t exp = permute_p<HALF_BLOCK, ROUND_KEY>(right, expansion_p);
@@ -111,7 +108,7 @@ uint64_t feistelFunction_p(const uint64_t subkey, const uint64_t right){
 }
 
 
-__device__ //chiamabile solo da funzioni CUDA
+__device__
 uint64_t desEncrypt_p(uint64_t key64, const uint64_t plaintext){
     uint64_t initialPermutation = permute_p<BLOCK, BLOCK>(plaintext, initialPerm_p);
 

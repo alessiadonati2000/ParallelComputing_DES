@@ -7,7 +7,7 @@
 #include <chrono>       // per misurare i tempi
 #include <sstream>      // per creare stringhe formattate
 #include <numeric>      // per funzioni matematiche
-#include <iomanip>      // PER FORMATTARE L'OUTPUT IN FILE
+#include <iomanip>      // per formattare l'output nel file
 #include <cuda_runtime.h>
 
 #include "utility.h"           // per funzioni di utilità
@@ -15,6 +15,9 @@
 #include "DES_parallel.cuh"    // per DES lato CUDA
 
 int main() {
+    // ========================================================
+    // 1. CONFIGURAZIONE E CARICAMENTO DATI
+    // ========================================================
     string passwordPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\password.txt)";
 
     auto time = std::time(nullptr);
@@ -23,13 +26,13 @@ int main() {
     date << std::put_time(&localTime, "%Y%m%d-%H%M%S");
     string resultsPath = R"(C:\Users\AleDo\CLionProjects\ParallelComputing_DES\Results\results-)" + date.str() + "RELEASE.txt";
 
-    bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
-    int pwdNum = 1000000;                           // grandezza del dizionario
-    int pwdLength = 8;                              // lunghezza delle password
-    int numCrack = 1000;                             // numero di password da decifrare
-    int numTests = 10;                              // ripetizioni dell'esperimento
-    vector<int> blockSizes = {32, 64, 128, 256};    // block size CUDA da testare
-    uint64_t key = toUint64_T("a2kvt8rz");    // chiave DES fissa per cifrare
+    bool overwrite = false;                         // Se true rigenera il dizionario anche se esiste
+    int pwdNum = 1000000;                           // Grandezza del dizionario
+    int pwdLength = 8;                              // Lunghezza delle password
+    int numCrack = 1000;                            // Numero di password da decifrare
+    int numTests = 10;                              // Ripetizioni dell'esperimento
+    vector<int> blockSizes = {32, 64, 128, 256};    // Block size CUDA da testare
+    uint64_t key = toUint64_T("a2kvt8rz");    // Chiave DES fissa per cifrare
 
     if (filesystem::exists(passwordPath) && !overwrite) {
         // Creo una lista delle password estraendole dal file
@@ -37,14 +40,14 @@ int main() {
         string pwd;
         int pwdCount = 0;
         auto *pwdList = new uint64_t [pwdNum];      // pwdList: è una lista che conterrà tutte le password del file
-        while (getline(passwordsFile, pwd) && pwdCount < pwdNum) {   // legge il file riga per riga
-            pwdList[pwdCount] = toUint64_T(pwd);                           // converte ogni password in uint64_t e la aggiunge alla lista
+        while (getline(passwordsFile, pwd) && pwdCount < pwdNum) {   // Legge il file riga per riga
+            pwdList[pwdCount] = toUint64_T(pwd);                           // Converte ogni password in uint64_t e la aggiunge alla lista
             pwdCount++;
         }
         passwordsFile.close();
 
         // Generazione set di test: creo numTest test con numCrack password scelte secondo una distribuzione uniforme
-        // queste numCrack password vengono criptate
+        // Queste numCrack password vengono criptate
         random_device rd;
         mt19937 gen(rd());
         uniform_int_distribution<> distrib(0, pwdNum); // TODO: avevo messo pwdNum - 1
@@ -66,7 +69,9 @@ int main() {
         printf("Numero di test da eseguire:     %d\n", numTests);
         cout << "Block size CUDA da testare:     " << toString<int>(blockSizes) << endl;
 
-
+        // ========================================================
+        // 2. BENCHMARK SEQUENZIALE
+        // ========================================================
         cout << "\n========================================================" << endl;
         cout << "           ESPERIMENTO SEQUENZIALE (CPU)" << endl;
         cout << "========================================================" << endl;
@@ -97,7 +102,9 @@ int main() {
             double sequentialAvg = accumulate(sequentialTimes.begin(), sequentialTimes.end(), 0.0) / (double)sequentialTimes.size();
             printf("\nTempo MEDIO sequenziale: %4.2f ms\n", sequentialAvg);
 
-
+        // ========================================================
+        // 3. BENCHMARK PARALLELO
+        // ========================================================
         cout << "\n========================================================" << endl;
         cout << "           ESPERIMENTO PARALLELO (CUDA)" << endl;
         cout << "========================================================" << endl;
@@ -136,7 +143,9 @@ int main() {
                 printf("Speedup vs Sequenziale: %4.2fx\n", speedUps.back());
             }
 
-        // ---------- SINTESI RISULTATI (CONSOLE) ----------
+        // ========================================================
+        // 4. RISULTATI
+        // ========================================================
         cout << "\n\n========================================================" << endl;
         cout << "                 SINTESI DEI RISULTATI" << endl;
         cout << "========================================================" << endl;
@@ -207,11 +216,6 @@ int main() {
         cout << "\nRisultati salvati in: " << resultsPath << endl;
 
         free(pwdList);
-        // TODO: questo lo ho aggiunto io
-        /*for(auto test : tests) {
-            delete[] test;
-        }
-        tests.clear();*/
 
     } else {
         vector<string> passwords = passwordsGeneration(pwdNum, pwdLength);

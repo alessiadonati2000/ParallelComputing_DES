@@ -142,7 +142,9 @@ namespace constants
 
 }
 
-// Genera numPassword parole casuali di lunghezza length
+/**
+ * @brief Genera numPassword parole casuali di lunghezza length
+ */
 static vector<string> passwordsGeneration(int numPassword, int length){
     random_device rd;
     mt19937 gen(rd());
@@ -160,7 +162,9 @@ static vector<string> passwordsGeneration(int numPassword, int length){
     return passwords;
 }
 
-// Converte una stringa max 8 caratteri in un intero 64 bit
+/**
+ * @brief Converte una stringa max 8 caratteri in un intero 64 bit
+ */
 static uint64_t toUint64_T(const string &str){
     uint64_t result = 0;
 
