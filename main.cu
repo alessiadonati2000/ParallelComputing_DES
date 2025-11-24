@@ -9,6 +9,7 @@
 #include <numeric>      // per funzioni matematiche
 #include <iomanip>      // PER FORMATTARE L'OUTPUT IN FILE
 #include <cuda_runtime.h>
+
 #include "utility.h"           // per funzioni di utilità
 #include "DES.h"               // per DES lato CPU
 #include "DES_parallel.cuh"    // per DES lato CUDA
@@ -25,7 +26,7 @@ int main() {
     bool overwrite = false;                         // se true rigenera il dizionario anche se esiste
     int pwdNum = 1000000;                           // grandezza del dizionario
     int pwdLength = 8;                              // lunghezza delle password
-    int numCrack = 100;                             // numero di password da decifrare
+    int numCrack = 1000;                             // numero di password da decifrare
     int numTests = 10;                              // ripetizioni dell'esperimento
     vector<int> blockSizes = {32, 64, 128, 256};    // block size CUDA da testare
     uint64_t key = toUint64_T("a2kvt8rz");    // chiave DES fissa per cifrare
@@ -46,7 +47,7 @@ int main() {
         // queste numCrack password vengono criptate
         random_device rd;
         mt19937 gen(rd());
-        uniform_int_distribution<> distrib(0, pwdNum-1);
+        uniform_int_distribution<> distrib(0, pwdNum); // TODO: avevo messo pwdNum - 1
         vector<uint64_t*> tests;
         for(int idTest = 0; idTest < numTests; idTest++){
             auto test = new uint64_t[numCrack];
@@ -111,7 +112,6 @@ int main() {
                 for (auto &pwdToCrack: tests)  {
                     printf("Avvio test parallelo %d/%d (Block size: %d)...\n", i + 1, (int)tests.size(), blockSize);
                     i++;
-
                     bool *found;
                     auto start = chrono::system_clock::now();
 
@@ -122,13 +122,16 @@ int main() {
                     parallelTimes.push_back((double)parallelElapsed.count());
                     printf("Test %d/%d completato: %4.2f ms\n", i + 1, (int)tests.size(), parallelTimes.back());
 
+                    for(int i = 0; i < numCrack; i++){
+                        if (!found[i])
+                            printf("Error occurred");
+                    }
+
                     free(found);
                 }
 
-                double avg = accumulate(parallelTimes.begin(), parallelTimes.end(), 0.0) / (double)parallelTimes.size();
-                parallelAvg.push_back(avg);
-                speedUps.push_back(sequentialAvg / avg);
-
+                parallelAvg.push_back(accumulate(parallelTimes.begin(), parallelTimes.end(), 0.0) / (double)parallelTimes.size());
+                speedUps.push_back(sequentialAvg / parallelAvg.back());
                 printf("\nTempo MEDIO (Block size %d): %4.2f ms\n", blockSize, parallelAvg.back());
                 printf("Speedup vs Sequenziale: %4.2fx\n", speedUps.back());
             }
@@ -203,11 +206,12 @@ int main() {
 
         cout << "\nRisultati salvati in: " << resultsPath << endl;
 
-        delete[] pwdList;
-        for(auto test : tests) {
+        free(pwdList);
+        // TODO: questo lo ho aggiunto io
+        /*for(auto test : tests) {
             delete[] test;
         }
-        tests.clear();
+        tests.clear();*/
 
     } else {
         vector<string> passwords = passwordsGeneration(pwdNum, pwdLength);

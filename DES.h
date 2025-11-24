@@ -2,8 +2,6 @@
 #define DES_DES_H
 #include <cstdint>
 
-using namespace std;
-
 // Funzione generica per eseguire permutazioni richieste da DES.cpp
 // FROM: lunghezza blocco sorgente
 // TO:   lunghezza blocco risultante

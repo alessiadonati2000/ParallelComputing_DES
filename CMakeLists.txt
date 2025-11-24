@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(DES LANGUAGES C CXX CUDA)
 find_package(CUDAToolkit REQUIRED)
+set(CMAKE_CUDA_ARCHITECTURES "75")
 include_directories(C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.5/include)
 set(CMAKE_CUDA_STANDARD 17)
 

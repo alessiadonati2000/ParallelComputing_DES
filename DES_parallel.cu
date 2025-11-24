@@ -24,27 +24,28 @@ __constant__ int keyShiftArray_p[ROUNDS];
 // Funzione host (chiamata da CPU): prepara i dati e lancia il kernel
 __host__
 bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int numCrack, uint64_t key, int blockSize){
+
     // Copia le tabelle in constant memory
-    cudaMemcpyToSymbol(initialPerm_p, initialPerm, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(finalPerm_p, finalPerm, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(expansion_p, expansion, sizeof(int) * ROUND_KEY);
-    cudaMemcpyToSymbol(S1_p, S1, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S2_p, S2, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S3_p, S3, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S4_p, S4, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S5_p, S5, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S6_p, S6, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S7_p, S7, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(S8_p, S8, sizeof(int) * BLOCK);
-    cudaMemcpyToSymbol(permutation_p, permutation, sizeof(int) * HALF_BLOCK);
-    cudaMemcpyToSymbol(permutedChoice1_p, permutedChoice1, sizeof(int) * 56);
-    cudaMemcpyToSymbol(permutedChoice2_p, permutedChoice2, sizeof(int) * ROUND_KEY);
-    cudaMemcpyToSymbol(keyShiftArray_p, keyShiftArray, sizeof(int) * ROUNDS);
+    cudaMemcpyToSymbol(initialPerm_p, constants::initialPerm, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(finalPerm_p, constants::finalPerm, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(expansion_p, constants::expansion, sizeof(int) * ROUND_KEY);
+    cudaMemcpyToSymbol(S1_p, constants::S1, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S2_p, constants::S2, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S3_p, constants::S3, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S4_p, constants::S4, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S5_p, constants::S5, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S6_p, constants::S6, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S7_p, constants::S7, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(S8_p, constants::S8, sizeof(int) * BLOCK);
+    cudaMemcpyToSymbol(permutation_p, constants::permutation, sizeof(int) * HALF_BLOCK);
+    cudaMemcpyToSymbol(permutedChoice1_p, constants::permutedChoice1, sizeof(int) * 56);
+    cudaMemcpyToSymbol(permutedChoice2_p, constants::permutedChoice2, sizeof(int) * ROUND_KEY);
+    cudaMemcpyToSymbol(keyShiftArray_p, constants::keyShiftArray, sizeof(int) * ROUNDS);
 
     // Alloca e copia i dati del dizionario, delle password target e found in memoria globale GPU
     uint64_t *pwdList_p, *pwdToCrack_p;
 
-    cudaMalloc((void **) &pwdList_p, pwdNum * sizeof(uint64_t));
+    cudaMalloc((void **)&pwdList_p, pwdNum * sizeof(uint64_t));
     cudaMemcpy(pwdList_p, pwdList, pwdNum * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
     cudaMalloc((void **) &pwdToCrack_p, numCrack * sizeof(uint64_t));
@@ -54,26 +55,10 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
     cudaMalloc((void **) &found_p, numCrack * sizeof(bool));
     cudaMemset(found_p, 0, numCrack * sizeof(bool));
 
-    // Ogni thread cifra una password del dizionario e la confronta con tutti i target
-    //kernelCrack<<<(pwdNum + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, pwdNum, pwdToCrack_p, numCrack, found_p, key);
+    kernelCrack<<<(pwdNum + blockSize - 1) / blockSize, blockSize>>>(pwdList_p, pwdNum, pwdToCrack_p, numCrack, found_p, key);
 
-        // 1. Alloca memoria per il dizionario cifrato su GPU
-        uint64_t *d_encryptedDictionary;
-        cudaMalloc(&d_encryptedDictionary, pwdNum * sizeof(uint64_t));
-
-        // 2. Lancia KERNEL 1 (Cifratura)
-        // Lanciamo 1.000.000 di thread (pwdNum)
-        int gridSizeEncrypt = (pwdNum + blockSize - 1) / blockSize;
-        kernelEncrypt<<<gridSizeEncrypt, blockSize>>>(pwdList_p, pwdNum, d_encryptedDictionary, key);
-
-        // 3. Lancia KERNEL 2 (Confronto)
-        // Lanciamo 10, 100 o 1000 thread (numCrack)
-        int gridSizeCompare = (numCrack + blockSize - 1) / blockSize;
-        kernelCompare<<<gridSizeCompare, blockSize>>>(d_encryptedDictionary, pwdNum, pwdToCrack_p, numCrack, found_p);
-
-        // 4. Sincronizza per essere sicuro che tutto sia finito
-        cudaDeviceSynchronize();
-
+    cudaPeekAtLastError();
+    cudaDeviceSynchronize();
     auto err = cudaGetLastError();
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA launch error (code=%d): %s\n", (int)err,
@@ -83,47 +68,27 @@ bool * parallelCrack(uint64_t *pwdList, int pwdNum, uint64_t *pwdToCrack, int nu
     // Copia i risultati indietro
     bool *found = new bool[numCrack];
     cudaMemcpy(found, found_p, numCrack * sizeof(bool), cudaMemcpyDeviceToHost);
-
     // Libera la memoria GPU
     cudaFree(pwdList_p);
     cudaFree(pwdToCrack_p);
     cudaFree(found_p);
-    cudaFree(d_encryptedDictionary);
 
     return found;
 }
 
-// KERNEL 1: Cifratura
-// Ogni thread (fino a pwdNum) cifra UNA password dal dizionario.
-// Esecuzione: 1.000.000 di thread in parallelo.
 __global__
-void kernelEncrypt(const uint64_t *pwdList, int pwdNum, uint64_t *encryptedDictionaryGPU, uint64_t key){
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < pwdNum){
-        // Ogni thread cifra una sola password e salva il risultato
-        encryptedDictionaryGPU[tid] = desEncrypt_p(key, pwdList[tid]);
-    }
-}
+void kernelCrack(const uint64_t *pwdList, int numPwd, const uint64_t *pwdToCrack, int numCrack, bool *found, uint64_t key) {
+    // Calcolo dell'ID globale del thread
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-
-// KERNEL 2: Confronto
-// Ogni thread (fino a numCrack) cerca UNA password target nel dizionario.
-// Esecuzione: 10, 100 o 1000 thread in parallelo.
-__global__
-void kernelCompare(const uint64_t *encryptedDictionaryGPU, int pwdNum, const uint64_t *pwdToCrack, int numCrack, bool *found){
-    int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < numCrack){
-        // Prendo la "mia" password target
-        uint64_t myTarget = pwdToCrack[tid];
-
-        // Scorro l'intero dizionario cifrato cercandola
-        for (int i = 0; i < pwdNum; i++){
-            if (encryptedDictionaryGPU[i] == myTarget){
-                found[tid] = true;
-                break; // Trovata! Posso uscire dal loop.
+    if (tid < numPwd){
+        uint64_t e = desEncrypt_p(key, pwdList[tid]);
+        for(int i = 0; i < numCrack; i++){
+            if (!found[i] && e == pwdToCrack[i]){
+                found[i] = true;
+                // printf("Thread-%d found password %d\n", tid, i);
             }
         }
-        // Se non la trovo, 'found[tid]' resta false (come inizializzato da cudaMemset)
     }
 }
 
